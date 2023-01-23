@@ -310,27 +310,34 @@ int main(int argc, char *argv[]) {
     shutdown_event->raise(true);
   });
 
+  // Update configuration from file
   proc::refresh(config::stream.file_apps);
 
+  // Initialize platform/OS specific services, e.g. shader compilation
   auto deinit_guard = platf::init();
   if(!deinit_guard) {
     return 4;
   }
 
+  // Precompute error correcting code tables
   reed_solomon_init();
+
+  // Initialize platform/OS specific keyboard and controller emulation
   auto input_deinit_guard = input::init();
+  // Discover/Initialize all valid video encoders
   if(video::init()) {
     return 2;
   }
+  // Create/Load credentials for http web service
   if(http::init()) {
     return 3;
   }
-
+  // Start DNS service for discovering this pc from client on LAN
   std::unique_ptr<platf::deinit_t> mDNS;
   auto sync_mDNS = std::async(std::launch::async, [&mDNS]() {
     mDNS = platf::publish::start();
   });
-
+  // Start UPNP service for automatic port forwarding on LAN
   std::unique_ptr<platf::deinit_t> upnp_unmap;
   auto sync_upnp = std::async(std::launch::async, [&upnp_unmap]() {
     upnp_unmap = upnp::start();
@@ -344,6 +351,7 @@ int main(int argc, char *argv[]) {
   std::thread httpThread { nvhttp::start };
   std::thread configThread { confighttp::start };
 
+  // Start RealTime Stream Protocol server. Blocking.
   stream::rtpThread();
 
   httpThread.join();

@@ -718,6 +718,7 @@ void rtpThread() {
     return;
   }
 
+  // Check for connections in a loop until shutdown called
   while(!shutdown_event->peek()) {
     server.iterate(std::min(500ms, config::stream.ping_timeout));
 

@@ -676,7 +676,7 @@ void controlBroadcastThread(control_server_t *server) {
     if(tagged_cipher_length >= 16 + sizeof(crypto::aes_t)) {
       std::copy(payload.end() - 16, payload.end(), std::begin(iv));
     }
-
+    // Setup input emulation
     input::print(plaintext.data());
     input::passthrough(session->input, std::move(plaintext));
   });
@@ -735,7 +735,7 @@ void controlBroadcastThread(control_server_t *server) {
     // Ensure compatibility with IDX_INPUT_DATA
     constexpr auto skip = sizeof(std::uint16_t) * 2;
     plaintext.erase(std::begin(plaintext), std::begin(plaintext) + skip);
-
+    // Setup input emulation 
     input::print(plaintext.data());
     input::passthrough(session->input, std::move(plaintext));
   });

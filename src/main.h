@@ -40,7 +40,9 @@ extern safe::mail_t man;
 
 // Global mail
 MAIL(shutdown);
+MAIL(pause);
 MAIL(broadcast_shutdown);
+MAIL(broadcast_pause);
 
 MAIL(video_packets);
 MAIL(audio_packets);

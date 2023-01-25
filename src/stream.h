@@ -33,12 +33,14 @@ enum class state_e : int {
   STOPPING,
   STARTING,
   RUNNING,
+  PAUSED,
 };
 
 std::shared_ptr<session_t> alloc(config_t &config, crypto::aes_t &gcm_key, crypto::aes_t &iv);
 int start(session_t &session, const std::string &addr_string);
 void stop(session_t &session);
 void join(session_t &session);
+void pause(session_t &session, bool pause);
 state_e state(session_t &session);
 } // namespace session
 } // namespace stream

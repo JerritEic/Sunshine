@@ -355,6 +355,7 @@ public:
 struct sync_session_ctx_t {
   safe::signal_t *join_event;
   safe::mail_raw_t::event_t<bool> shutdown_event;
+  safe::mail_raw_t::event_t<bool> pause_event;
   safe::mail_raw_t::queue_t<packet_t> packets;
   safe::mail_raw_t::event_t<bool> idr_events;
   safe::mail_raw_t::event_t<input::touch_port_t> touch_port_events;
@@ -1315,6 +1316,10 @@ encode_e encode_run_sync(
 
           continue;
         }
+        if(ctx->pause_event->peek()){
+          ++pos;
+          continue;
+        }
 
         if(ctx->idr_events->peek()) {
           frame->pict_type = AV_PICTURE_TYPE_I;
@@ -1398,6 +1403,7 @@ void capture_async(
   void *channel_data) {
 
   auto shutdown_event = mail->event<bool>(mail::shutdown);
+  auto paused_event = mail->event<bool>(mail::pause);
 
   auto images = std::make_shared<img_event_t::element_type>();
   auto lg     = util::fail_guard([&]() {
@@ -1425,6 +1431,10 @@ void capture_async(
   platf::adjust_thread_priority(platf::thread_priority_e::high);
 
   while(!shutdown_event->peek() && images->running()) {
+    if(paused_event->peek()){
+      continue;
+    }
+
     // Wait for the main capture event when the display is being reinitialized
     if(ref->reinit_event.peek()) {
       std::this_thread::sleep_for(100ms);
@@ -1491,6 +1501,7 @@ void capture(
     ref->encode_session_ctx_queue.raise(sync_session_ctx_t {
       &join_event,
       mail->event<bool>(mail::shutdown),
+      mail->event<bool>(mail::pause),
       mail::man->queue<packet_t>(mail::video_packets),
       std::move(idr_events),
       mail->event<input::touch_port_t>(mail::touch_port),

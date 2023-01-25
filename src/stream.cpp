@@ -315,6 +315,7 @@ struct session_t {
   } control;
 
   safe::mail_raw_t::event_t<bool> shutdown_event;
+  safe::mail_raw_t::event_t<bool> paused_event;
   safe::signal_t controlEnd;
 
   std::atomic<session::state_e> state;
@@ -439,7 +440,7 @@ void control_server_t::iterate(std::chrono::milliseconds timeout) {
     case ENET_EVENT_TYPE_DISCONNECT:
       BOOST_LOG(info) << "CLIENT DISCONNECTED"sv;
       // No more clients to send video data to ^_^
-      if(session->state == session::state_e::RUNNING) {
+      if(session->state == session::state_e::RUNNING || session->state == session::state_e::PAUSED) {
         session::stop(*session);
       }
       break;
@@ -1347,6 +1348,21 @@ state_e state(session_t &session) {
   return session.state.load(std::memory_order_relaxed);
 }
 
+void pause(session_t &session, bool pause){
+  while_starting_do_nothing(session.state);
+  auto expected         = state_e::RUNNING;
+  auto already_paused = !session.state.compare_exchange_strong(expected, state_e::PAUSED);
+
+  if(already_paused && !pause){
+    session.state.store(session::state_e::RUNNING);
+    session.paused_event->raise(false);
+  }
+  else if(!already_paused && pause){
+    session.state.store(session::state_e::PAUSED);
+    session.paused_event->raise(true);
+  }
+}
+
 void stop(session_t &session) {
   while_starting_do_nothing(session.state);
   auto expected         = state_e::RUNNING;
@@ -1475,6 +1491,7 @@ std::shared_ptr<session_t> alloc(config_t &config, crypto::aes_t &gcm_key, crypt
   auto mail = std::make_shared<safe::mail_raw_t>();
 
   session->shutdown_event = mail->event<bool>(mail::shutdown);
+  session->paused_event = mail->event<bool>(mail::pause);
 
   session->config = config;
 

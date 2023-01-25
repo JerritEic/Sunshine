@@ -123,6 +123,7 @@ void encodeThread(sample_queue_t samples, config_t config, void *channel_data) {
 
 void capture(safe::mail_t mail, config_t config, void *channel_data) {
   auto shutdown_event = mail->event<bool>(mail::shutdown);
+  auto paused_event = mail->event<bool>(mail::pause);
   auto stream         = &stream_configs[map_stream(config.channels, config.flags[config_t::HIGH_QUALITY])];
 
   auto ref = control_shared.ref();
@@ -200,6 +201,9 @@ void capture(safe::mail_t mail, config_t config, void *channel_data) {
   }
 
   while(!shutdown_event->peek()) {
+    if(paused_event->peek()){
+      continue;
+    }
     std::vector<std::int16_t> sample_buffer;
     sample_buffer.resize(samples_per_frame);
 

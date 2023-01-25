@@ -343,6 +343,16 @@ public:
 
     ++_slot_count;
   }
+  
+  void pause(bool pause) {
+    auto lg = _session_slots.lock();
+
+    for(auto &slot : *_session_slots) {
+      if(slot) {
+        session::pause(*slot, pause);
+      }
+    }
+  }
 
   std::shared_ptr<session_t> *accept(std::shared_ptr<session_t> &session) {
     auto lg = _session_slots.lock();
@@ -688,14 +698,37 @@ void cmd_announce(rtsp_server_t *server, tcp::socket &sock, msg_t &&req) {
 }
 
 void cmd_play(rtsp_server_t *server, tcp::socket &sock, msg_t &&req) {
+  BOOST_LOG(info) << "Play request received"sv;
   OPTION_ITEM option {};
 
   // I know these string literals will not be modified
   option.option = const_cast<char *>("CSeq");
 
   auto seqn_str  = std::to_string(req->sequenceNumber);
-  option.content = const_cast<char *>(seqn_str.c_str());
+  auto session_name = const_cast<char *>(seqn_str.c_str());
+  option.content = session_name;
 
+  // Unpause any paused streams
+  server->pause(false);
+
+  respond(sock, &option, 200, "OK", req->sequenceNumber, {});
+}
+
+void cmd_pause(rtsp_server_t *server, tcp::socket &sock, msg_t &&req) {
+  BOOST_LOG(info) << "Pause request received"sv;
+  OPTION_ITEM option {};
+
+  // I know these string literals will not be modified
+  option.option = const_cast<char *>("CSeq");
+
+  auto seqn_str  = std::to_string(req->sequenceNumber);
+  auto session_name = const_cast<char *>(seqn_str.c_str());
+  option.content = session_name;
+
+  // Pause any unpaused streams
+  server->pause(true);
+
+  // Always allow a pause, even if already paused.
   respond(sock, &option, 200, "OK", req->sequenceNumber, {});
 }
 
@@ -707,7 +740,7 @@ void rtpThread() {
   server.map("DESCRIBE"sv, &cmd_describe);
   server.map("SETUP"sv, &cmd_setup);
   server.map("ANNOUNCE"sv, &cmd_announce);
-
+  server.map("PAUSE"sv, &cmd_pause);
   server.map("PLAY"sv, &cmd_play);
 
   boost::system::error_code ec;
